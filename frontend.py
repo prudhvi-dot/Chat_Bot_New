@@ -1,7 +1,7 @@
 import streamlit as st
 import uuid
 from chatbot import chatbot, retrieve_all_threads
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 
 def reset_chat():
@@ -66,7 +66,13 @@ for message in st.session_state["message_history"]:
 
 user_input = st.chat_input("Type here")
 
-config = {"configurable": {"thread_id": st.session_state["thread_id"]}}
+# config = {"configurable": {"thread_id": st.session_state["thread_id"]}}
+
+config = {
+    "configurable": {"thread_id": st.session_state["thread_id"]},
+    "metadata": {"thread_id": st.session_state["thread_id"]},
+    "run_name": "chat_turn",
+}
 
 if user_input:
     st.session_state["message_history"].append({"role": "user", "content": user_input})
@@ -75,14 +81,17 @@ if user_input:
         st.text(user_input)
 
     with st.chat_message("assistant"):
-        ai_message = st.write_stream(
-            message_chunk.content
+
+        def ai_only_stream():
             for message_chunk, metadata in chatbot.stream(
                 {"messages": [HumanMessage(content=user_input)]},
                 config=config,
                 stream_mode="messages",
-            )
-        )
+            ):
+                if isinstance(message_chunk, AIMessage):
+                    yield message_chunk.content
+
+        ai_message = st.write_stream(ai_only_stream())
 
     st.session_state["message_history"].append(
         {"role": "assistant", "content": ai_message}
